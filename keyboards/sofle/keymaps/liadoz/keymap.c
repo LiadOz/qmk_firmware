@@ -27,7 +27,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 /*
  * QWERTY
  * ,-----------------------------------------.                    ,-----------------------------------------.
- * |  `   |   1  |   2  |   3  |   4  |   5  |                    |   6  |   7  |   8  |   9  |   0  |  -   |
+ * |leader|   1  |   2  |   3  |   4  |   5  |                    |   6  |   7  |   8  |   9  |   0  |  -   |
  * |------+------+------+------+------+------|                    |------+------+------+------+------+------|
  * | ESC  |   Q  |   W  |   E  |   R  |   T  |                    |   Y  |   U  |   I  |   O  |   P  | Bspc |
  * |------+------+------+------+------+------|                    |------+------+------+------+------+------|
@@ -87,7 +87,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 [_LOWER] = LAYOUT( \
   _______,   KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,                       KC_F6,   KC_F7,   KC_F8,   KC_F9,  KC_F10,  KC_F11,\
   KC_GRV,    KC_1,    KC_2,    KC_3,    KC_4,    KC_5,                       KC_6,    KC_7,    KC_8,    KC_9,    KC_0,  KC_F12, \
-  _______, KC_EXLM,   KC_AT, KC_HASH,  KC_DLR, KC_PERC,                       KC_CIRC, KC_AMPR, KC_ASTR, KC_LPRN, KC_RPRN, KC_PIPE, \
+  _______, KC_EXLM,   KC_AT, KC_LEAD,  KC_LEAD, KC_PERC,                       KC_CIRC, KC_AMPR, KC_ASTR, KC_LPRN, KC_RPRN, KC_PIPE, \
   _______,  KC_EQL, KC_MINS, KC_PLUS, KC_LCBR, KC_RCBR, _______,       _______, KC_LBRC, KC_RBRC, KC_SCLN, KC_COLN, KC_BSLS, _______, \
                        _______, _______, _______, _______, _______,       _______, _______, _______, _______, _______\
 ),
@@ -147,6 +147,13 @@ static void render_logo(void) {
     oled_write_P(qmk_logo, false);
 }
 
+static void render_ozonzono(void) {
+    oled_write_P(PSTR("\n"), false);
+    oled_write_ln_P(PSTR("ozonzoboard by"), false);
+    oled_write_ln_P(PSTR(""), false);
+    oled_write_ln_P(PSTR("          liad oz"), false);
+}
+
 static void print_status_narrow(void) {
     // Print current mode
     oled_write_P(PSTR("\n\n"), false);
@@ -200,11 +207,15 @@ oled_rotation_t oled_init_user(oled_rotation_t rotation) {
     return rotation;
 }
 
+static void (*render_main)(void) = &print_status_narrow;
+static void (*render_other)(void) = &render_ozonzono;
+
 void oled_task_user(void) {
+    oled_set_brightness(0);
     if (is_keyboard_master()) {
-        print_status_narrow();
+        (*render_main)();
     } else {
-        render_logo();
+        (*render_other)();
     }
 }
 
@@ -371,23 +382,106 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     return true;
 }
 
-#ifdef ENCODER_ENABLE
-
-bool encoder_update_user(uint8_t index, bool clockwise) {
-    if (index == 0) {
-        if (clockwise) {
-            tap_code(KC_VOLU);
-        } else {
-            tap_code(KC_VOLD);
-        }
-    } else if (index == 1) {
-        if (clockwise) {
-            tap_code(KC_PGDOWN);
-        } else {
-            tap_code(KC_PGUP);
-        }
-    }
-    return true;
+#ifdef LEADER_ENABLE
+void change_lang(void) {
+    register_code(KC_LALT);
+    register_code(KC_LSFT);
+    unregister_code(KC_LSFT);
+    unregister_code(KC_LALT);
 }
+
+LEADER_EXTERNS();
+void matrix_scan_user(void) {
+  LEADER_DICTIONARY() {
+    leading = false;
+    leader_end();
+
+    SEQ_ONE_KEY(KC_F) {
+      // send f in hebrew
+      change_lang();
+      register_code(KC_F);
+      unregister_code(KC_F);
+      change_lang();
+    }
+
+    SEQ_ONE_KEY(KC_H) {
+      // print help string
+      SEND_STRING(SS_LGUI("r") SS_DELAY(500) "notepad" SS_TAP(X_ENT) SS_DELAY(500));
+      SEND_STRING("Leader keybindings:\n\ta (+apps)\n\t\te - explorer\n\t\tp - powershell\n\t\ts - snippet\n\ti (+insert)\n\t\tg - github\n\t\tt - typefight\n\tf - go fullscreen on youtube\n");
+    }
+
+    SEQ_TWO_KEYS(KC_I, KC_G) {
+      SEND_STRING("https://github.com/LiadOz/");
+    }
+    SEQ_TWO_KEYS(KC_I, KC_T) {
+      SEND_STRING("https://typefight.me/");
+    }
+    SEQ_TWO_KEYS(KC_A, KC_S) {
+        // snippet tool
+        register_code(KC_LSFT);
+        SEND_STRING(SS_LGUI("s"));
+        unregister_code(KC_LSFT);
+    }
+    SEQ_TWO_KEYS(KC_A, KC_P) {
+        SEND_STRING(SS_LGUI("r") SS_DELAY(500) "powershell" SS_TAP(X_ENT) SS_DELAY(500));
+    }
+    SEQ_TWO_KEYS(KC_A, KC_E) {
+      // open file explorer
+      register_code(KC_LGUI);
+      register_code(KC_E);
+      unregister_code(KC_E);
+      unregister_code(KC_LGUI);
+    }
+  }
+}
+
+#ifdef OLED_DRIVER_ENABLE
+
+static void leader_main(void) {
+    oled_write_ln_P(PSTR("ae ap"), false);
+    oled_write_ln_P(PSTR(""), false);
+    oled_write_ln_P(PSTR("as"), false);
+    oled_write_ln_P(PSTR(""), false);
+    oled_write_ln_P(PSTR("ig it"), false);
+    oled_write_ln_P(PSTR(""), false);
+    oled_write_ln_P(PSTR("f"), false);
+    oled_write_P(PSTR("\n\n"), false);
+    oled_write_ln_P(PSTR("h for"), false);
+    oled_write_ln_P(PSTR("HELP"), false);
+}
+
+static void leader_other(void) {
+}
+
+void leader_start(void) {
+    oled_clear();
+    render_main = &leader_main;
+    render_other = &leader_other;
+}
+
+void leader_end(void) {
+    oled_clear();
+    render_main = &print_status_narrow;
+    render_other = &render_logo;
+}
+
+#endif
+
+#endif
+
+enum combos {
+  DF_ESC,
+  JK_ESC
+};
+
+
+#ifdef COMBO_ENABLE
+const uint16_t PROGMEM df_combo[] = {KC_D, KC_F, COMBO_END};
+const uint16_t PROGMEM jk_combo[] = {KC_J, KC_K, COMBO_END};
+
+combo_t key_combos[COMBO_COUNT] = {
+  [DF_ESC] = COMBO(df_combo, KC_ESC),
+  [JK_ESC] = COMBO(jk_combo, KC_ESC)
+};
 
 #endif
